@@ -1,0 +1,83 @@
+---
+title: "NYPD Shooting Incident Data Report"
+date: "2/5/2022"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(message = FALSE)
+knitr::opts_chunk$set(warning = FALSE)
+library(tidyverse)
+library(lubridate)
+```
+
+## New York City (NYC) Shooting Incidents Are On The Rise
+(Note: echo = TRUE so that R code may be seen as per course instructions)
+
+Shooting incidents in NYC have generally been falling since 2011, however 2020 has shown a sharp increase in shooting incidents across the Brooklyn, the Bronx, Manhattan, Queens, and Staten Island with the highest increase being in Brooklyn. This is shown in the following diagram:
+
+```{r shooting}
+
+shooting <- read_csv("https://data.cityofnewyork.us/api/views/833y-fsy8/rows.csv?accessType=DOWNLOAD")
+
+shooting <- mutate(shooting, YEAR = year(mdy(OCCUR_DATE)), MONTH = month(mdy(OCCUR_DATE)), DAY = day(mdy(OCCUR_DATE)), MONTH_YEAR = str_c(month(mdy(OCCUR_DATE)), '-', year(mdy(OCCUR_DATE))))
+
+
+total <- distinct(shooting %>% add_count(BORO, YEAR) %>% select(BORO,YEAR, n) %>% rename(SHOOTINGS = n))
+xlabels = min(shooting$YEAR):max(shooting$YEAR)
+```
+
+```{r plot_shootings_by_year_boro}
+
+ggplot(total, aes(x = YEAR, y = SHOOTINGS)) + 
+  geom_line(aes(color = BORO, linetype = BORO)) +
+  scale_x_continuous(labels=xlabels,breaks = xlabels) +
+  theme(legend.position = "bottom") +
+  labs(title = "Shootings by Year",
+       x = "Year",
+       y = "Shootings")
+```
+```{r plot_murders_by_year_boro}
+murders <- filter(shooting, STATISTICAL_MURDER_FLAG == 'TRUE')
+total_murders <- distinct(murders %>% add_count(BORO, YEAR) %>% select(BORO,YEAR, n) %>% rename(SHOOTINGS = n))
+xlabels = min(murders$YEAR):max(murders$YEAR)
+ggplot(total_murders, aes(x = YEAR, y = SHOOTINGS)) + 
+  geom_line(aes(color = BORO, linetype = BORO)) +
+  scale_x_continuous(labels=xlabels,breaks = xlabels) +
+  theme(legend.position = "bottom") +
+  labs(title = "Murders by Year",
+       x = "Year",
+       y = "Murders")
+```
+```{r model}
+total <- distinct(shooting %>% add_count(BORO, YEAR) %>% select(BORO,YEAR, n) %>% rename(SHOOTINGS = n))
+total_murders <- distinct(murders %>% add_count(BORO, YEAR) %>% select(BORO,YEAR, n) %>% rename(MURDERS = n))
+tot = distinct(inner_join(total,total_murders))
+tot <- mutate(tot, PERCENT_MUR=MURDERS/SHOOTINGS)
+mod <- lm(PERCENT_MUR ~ SHOOTINGS, data = tot)
+tot_w_pred <- tot %>% mutate(pred = predict(mod))
+
+tot_w_pred %>% ggplot() +
+  geom_point(aes(x = SHOOTINGS, y=PERCENT_MUR), color = "blue") +
+  geom_point(aes(x = SHOOTINGS, y=pred), color = "red") +
+  labs(title = "Graph: Model",
+       x = "Year",
+       y = "Murder Percentage")
+
+```
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+
+```{r sessioninfo, echo=FALSE}
+sessionInfo()
+```
